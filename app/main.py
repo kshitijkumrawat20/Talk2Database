@@ -7,11 +7,8 @@ app = FastAPI()
 # Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://talk2sql-frontend.vercel.app",  # Vite's default development port
-        "http://localhost:3000", 
-    ],
     allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins temporarily
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
