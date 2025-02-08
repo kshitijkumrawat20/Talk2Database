@@ -57,7 +57,8 @@ jobs:
             aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
             
             # Navigate to deployment directory
-            cd /home/${{ secrets.EC2_USER }}/Talk2SQL/backend
+            mkdir -p /home/***/Talk2SQL/backend
+            cd /home/***/Talk2SQL/backend
             
             # Update docker-compose.yml with latest image
             echo "version: '3.8'
@@ -67,10 +68,6 @@ jobs:
                 image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
                 ports:
                   - \"80:80\"
-                environment:
-                  - DATABASE_URL=\${DATABASE_URL}
-                  - JWT_SECRET=\${JWT_SECRET}
-                  - OPENAI_API_KEY=\${OPENAI_API_KEY}
                 restart: unless-stopped" > docker-compose.yml
             
             # Pull latest image and deploy
