@@ -5,14 +5,17 @@ on:
     branches:
       - main
     paths:
-      - 'backend/**'
+      - 'app/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - 'requirements.txt'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: app
 
     steps:
       - name: Checkout repository
@@ -35,7 +38,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: ./backend
+          context: .
           push: true
           tags: |
             ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
