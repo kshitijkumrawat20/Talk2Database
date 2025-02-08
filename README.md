@@ -320,6 +320,93 @@ This section provides a detailed, step-by-step guide for setting up your AWS env
 - Make sure that the CORS settings in your backend allow requests from the Vercel domain where the frontend is deployed.
 - Test connectivity by accessing the backend API from the frontend once deployment is complete.
 
+## Frontend Integration with Streamlit
+
+The application now includes a Streamlit-based frontend that runs alongside the FastAPI backend in a single container. This section details the frontend structure and setup.
+
+### Frontend Components
+
+1. **Login/Signup Page**
+   - User authentication with SQLite database
+   - Session management for logged-in users
+   - Password hashing and security features
+
+2. **Database Connection Page**
+   - Interface to configure database connections
+   - Support for SQLite, PostgreSQL, and MySQL
+   - Connection testing and validation
+
+3. **Chat Interface**
+   - Natural language query input
+   - SQL query display and results visualization
+   - Query history tracking
+
+### Container Architecture
+
+The application runs both services in a single container:
+- FastAPI Backend: Port 8000
+- Streamlit Frontend: Port 80
+
+Services are launched using a `start.sh` script that manages both processes:
+```bash
+# Example start.sh
+#!/bin/bash
+uvicorn main:app --host 0.0.0.0 --port 8000 &
+streamlit run frontend/app.py --server.port 80 --server.address 0.0.0.0
+```
+
+### Building and Running
+
+1. **Build the Container**
+   ```bash
+   docker-compose build
+   ```
+
+2. **Start the Services**
+   ```bash
+   docker-compose up
+   ```
+
+3. **Access the Application**
+   - Frontend: http://localhost (Port 80)
+   - Backend API: http://localhost:8000/api/v1
+
+### API Integration
+
+The frontend communicates with the backend using the following base URL:
+```python
+API_BASE_URL = "http://localhost:8000/api/v1"
+```
+
+Key API endpoints used by the frontend:
+- POST /api/v1/auth/login
+- POST /api/v1/auth/signup
+- POST /api/v1/connect
+- POST /api/v1/query
+- GET /api/v1/schema
+
+### Troubleshooting
+
+1. **Process Management Issues**
+   - Check container logs: `docker-compose logs`
+   - Verify both services are running: `docker-compose ps`
+   - Restart container if services fail: `docker-compose restart`
+
+2. **Port Conflicts**
+   - Ensure ports 80 and 8000 are available
+   - Modify port mappings in docker-compose.yml if needed
+   - Check for other services using these ports
+
+3. **Frontend-Backend Communication**
+   - Verify API base URL configuration
+   - Check CORS settings in FastAPI
+   - Ensure network connectivity between services
+
+4. **Authentication Issues**
+   - Verify SQLite database permissions
+   - Check session management configuration
+   - Clear browser cache and cookies if needed
+
 ## Contributing
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.

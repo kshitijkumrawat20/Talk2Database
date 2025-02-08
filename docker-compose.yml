@@ -2,5 +2,5 @@ services:
   app:
     image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest  # Pull image from ECR
     ports:
-      - "80:80"
+      - "80:80"  # Maps container port 80 (Streamlit frontend) to host port 80. Backend runs internally on port 8000
     restart: unless-stopped
