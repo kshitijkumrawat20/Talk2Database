@@ -67,7 +67,7 @@ def login_page():
                     st.session_state.logged_in = True
                     st.session_state.username = username
                     st.session_state.current_page = 'db_connection'
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error('Invalid username or password')
     
@@ -102,8 +102,9 @@ def db_connection_page():
                 )
                 if response.status_code == 200:
                     st.success('Database connected successfully!')
+                    st.session_state.db_connected = True
                     st.session_state.current_page = 'chat'
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error(f'Connection failed: {response.text}')
             except requests.RequestException as e:
@@ -138,7 +139,7 @@ def chat_page():
                 result = response.json()
                 # Add assistant response to chat history
                 st.session_state.chat_history.append({"role": "assistant", "content": result})
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error(f'Query failed: {response.text}')
         except requests.RequestException as e:
@@ -168,13 +169,18 @@ def main():
     elif st.session_state.current_page == 'db_connection':
         db_connection_page()
     elif st.session_state.current_page == 'chat':
+        if not st.session_state.get('db_connected', False):
+            st.error('Database not connected. Redirecting to Database Connection page')
+            st.session_state.current_page = 'db_connection'
+            st.rerun()
         chat_page()
 
 def logout():
     st.session_state.logged_in = False
     st.session_state.username = None
     st.session_state.current_page = 'login'
-    st.experimental_rerun()
+    st.session_state.db_connected = False
+    st.rerun()
 
 if __name__ == '__main__':
     main()
