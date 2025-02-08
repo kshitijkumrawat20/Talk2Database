@@ -57,8 +57,14 @@ jobs:
             aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
             
             # Navigate to deployment directory
-            mkdir -p /home/***/Talk2SQL/backend
-            cd /home/***/Talk2SQL/backend
+            mkdir -p /home/ubuntu/Talk2SQL/backend
+            cd /home/ubuntu/Talk2SQL/backend
+            
+            # Stop and remove the old container
+            docker-compose down
+            
+            # Remove old unused images
+            docker image prune -af
             
             # Update docker-compose.yml with latest image
             echo "version: '3.8'
