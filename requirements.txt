@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+langchain
+langgraph
+langchain-groq
+pydantic
+sqlalchemy
+psycopg2-binary==2.9.6
+pymysql
+langchain-community
+langchain-core  
