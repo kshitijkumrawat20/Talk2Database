@@ -8,8 +8,8 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # Vite's default development port
-        "http://localhost:3000",  # Alternative frontend port
+        "https://talk2sql-frontend.vercel.app",  # Vite's default development port
+        "http://localhost:3000", 
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
