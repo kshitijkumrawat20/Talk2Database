@@ -52,6 +52,7 @@ def init_session_state():
 
 # Login/Signup page
 def login_page():
+    st.header('TALK2SQL')
     st.title('Login / Sign Up')
     
     tab1, tab2 = st.tabs(['Login', 'Sign Up'])
