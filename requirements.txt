@@ -10,3 +10,4 @@ pymysql
 langchain-community
 langchain-core  
 streamlit
+pandas

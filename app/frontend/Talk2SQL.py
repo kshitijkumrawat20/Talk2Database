@@ -2,7 +2,7 @@ import streamlit as st
 import sqlite3
 import requests
 import hashlib
-
+import pandas as pd
 # Initialize SQLite database
 def init_db():
     conn = sqlite3.connect('users.db')
@@ -98,20 +98,19 @@ def db_connection_page():
         
         # Sample connection string
         st.subheader("Sample Connection String")
-        sample_conn = "mysql+pymysql://admin:9522359448@mydatabase.cf8u2cy0a4h6.us-east-1.rds.amazonaws.com:3306/mydb"
-        st.code(sample_conn, language='text')
-        st.button("Copy Connection String", on_click=lambda: st.write(f'<script>navigator.clipboard.writeText("{sample_conn}");</script>', unsafe_allow_html=True))
+        st.sidebar.subheader("Sample Connection String")
+        st.sidebar.code("mysql+pymysql://admin:9522359448@mydatabase.cf8u2cy0a4h6.us-east-1.rds.amazonaws.com:3306/mydb")
         
-        # Sample table data
-        st.subheader("Sample Table Structure")
-        sample_data = """
-id,first_name,last_name,email,hire_date,salary
-1,John,Doe,johnD@abc.com,2020-01-01,50000.00
-2,Jane,Doe,JaneDabc.com,2020-05-01,60000.00
-3,Tom,Smith,toms@abc.com,2020-03-01,70000.00
-4,Jerry,Jones,Jerry@abc.com,2020-02-01,80000.00
-"""
-        st.code(sample_data, language='text')
+        st.sidebar.subheader("Sample Table")
+        sample_data = pd.DataFrame({
+            "id": [1, 2, 3, 4],
+            "first_name": ["John", "Jane", "Tom", "Jerry"],
+            "last_name": ["Doe", "Doe", "Smith", "Jones"],
+            "email": ["johnD@abc.com", "JaneD@abc.com", "toms@abc.com", "Jerry@abc.com"],
+            "hire_date": ["2020-01-01", "2020-05-01", "2020-03-01", "2020-02-01"],
+            "salary": [50000, 60000, 70000, 80000]
+        })
+        st.sidebar.dataframe(sample_data)
         
         # Sample questions
         st.subheader("Sample Questions")
