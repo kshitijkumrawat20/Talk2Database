@@ -92,6 +92,43 @@ def db_connection_page():
     st.header('Talk2SQL👨🏼‍💻🛢')
     st.title('Database Connection')
     
+    # Sidebar content
+    with st.sidebar:
+        st.header("Sample Data")
+        
+        # Sample connection string
+        st.subheader("Sample Connection String")
+        sample_conn = "mysql+pymysql://admin:9522359448@mydatabase.cf8u2cy0a4h6.us-east-1.rds.amazonaws.com:3306/mydb"
+        st.code(sample_conn, language='text')
+        st.button("Copy Connection String", on_click=lambda: st.write(f'<script>navigator.clipboard.writeText("{sample_conn}");</script>', unsafe_allow_html=True))
+        
+        # Sample table data
+        st.subheader("Sample Table Structure")
+        sample_data = """
+id,first_name,last_name,email,hire_date,salary
+1,John,Doe,johnD@abc.com,2020-01-01,50000.00
+2,Jane,Doe,JaneDabc.com,2020-05-01,60000.00
+3,Tom,Smith,toms@abc.com,2020-03-01,70000.00
+4,Jerry,Jones,Jerry@abc.com,2020-02-01,80000.00
+"""
+        st.code(sample_data, language='text')
+        
+        # Sample questions
+        st.subheader("Sample Questions")
+        questions = [
+            "What is the email of John?",
+            "What is the lastname of Tom?",
+            "Hiredate of the Jerry?"
+        ]
+        for q in questions:
+            st.markdown(f"- {q}")
+        
+        # Logout button
+        st.divider()
+        if st.button("Logout", type="primary"):
+            logout()
+    
+    # Main content
     db_options = ["MySQL", "PostgreSQL"]
     db_type = st.selectbox("Select Database Type", db_options)
     placeholder_text = "" 
@@ -119,7 +156,7 @@ def db_connection_page():
                     st.error(f'Connection failed: {response.text}')
             except requests.RequestException as e:
                 st.error(f'Error connecting to backend: {str(e)}')
-
+                
 # Chat interface page
 def chat_page():
     st.set_page_config(page_title="Talk2SQL👨🏼‍💻🛢", layout="wide")
