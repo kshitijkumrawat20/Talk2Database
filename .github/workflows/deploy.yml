@@ -10,6 +10,7 @@ on:
       - 'Dockerfile'
       - 'requirements.txt'
       - 'start.sh'
+      - 'deploy.yml'
 
 jobs:
   deploy:
