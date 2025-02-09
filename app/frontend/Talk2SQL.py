@@ -2,35 +2,31 @@ import streamlit as st
 import sqlite3
 import requests
 import hashlib
-import os
-from typing import Optional
+import pandas as pd
 
 # Initialize SQLite database
 def init_db():
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (username TEXT PRIMARY KEY, password TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)''')
     conn.commit()
     conn.close()
 
 # Hash password
-def hash_password(password: str) -> str:
+def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# User authentication
-def authenticate_user(username: str, password: str) -> bool:
+# Authenticate user
+def authenticate_user(username, password):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute('SELECT password FROM users WHERE username=?', (username,))
     result = c.fetchone()
     conn.close()
-    if result and result[0] == hash_password(password):
-        return True
-    return False
+    return result and result[0] == hash_password(password)
 
-# User registration
-def register_user(username: str, password: str) -> bool:
+# Register user
+def register_user(username, password):
     try:
         conn = sqlite3.connect('users.db')
         c = conn.cursor()
@@ -50,11 +46,9 @@ def init_session_state():
     if 'username' not in st.session_state:
         st.session_state.username = None
 
-# Login/Signup page
+# Login/Signup Page
 def login_page():
-    st.header('TALK2SQL')
     st.title('Login / Sign Up')
-    
     tab1, tab2 = st.tabs(['Login', 'Sign Up'])
     
     with tab1:
@@ -62,23 +56,20 @@ def login_page():
             username = st.text_input('Username')
             password = st.text_input('Password', type='password')
             submit = st.form_submit_button('Login')
-            
-            if submit:
-                if authenticate_user(username, password):
-                    st.session_state.logged_in = True
-                    st.session_state.username = username
-                    st.session_state.current_page = 'db_connection'
-                    st.rerun()
-                else:
-                    st.error('Invalid username or password')
+            if submit and authenticate_user(username, password):
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.session_state.current_page = 'db_connection'
+                st.rerun()
+            elif submit:
+                st.error('Invalid username or password')
     
     with tab2:
         with st.form('signup_form'):
-            new_username = st.text_input('Username')
-            new_password = st.text_input('Password', type='password')
+            new_username = st.text_input('New Username')
+            new_password = st.text_input('New Password', type='password')
             confirm_password = st.text_input('Confirm Password', type='password')
             submit = st.form_submit_button('Sign Up')
-            
             if submit:
                 if new_password != confirm_password:
                     st.error('Passwords do not match')
@@ -87,101 +78,83 @@ def login_page():
                 else:
                     st.error('Username already exists')
 
-# Database connection page
+# Database Connection Page
 def db_connection_page():
     st.title('Database Connection')
     
+    st.sidebar.subheader("Sample Connection String")
+    st.sidebar.code("mysql+pymysql://admin:9522359448@mydatabase.cf8u2cy0a4h6.us-east-1.rds.amazonaws.com:3306/mydb")
+    
+    st.sidebar.subheader("Sample Table")
+    sample_data = pd.DataFrame({
+        "id": [1, 2, 3, 4],
+        "first_name": ["John", "Jane", "Tom", "Jerry"],
+        "last_name": ["Doe", "Doe", "Smith", "Jones"],
+        "email": ["johnD@abc.com", "JaneD@abc.com", "toms@abc.com", "Jerry@abc.com"],
+        "hire_date": ["2020-01-01", "2020-05-01", "2020-03-01", "2020-02-01"],
+        "salary": [50000, 60000, 70000, 80000]
+    })
+    st.sidebar.dataframe(sample_data)
+    
+    db_type = st.selectbox("Select Database Type", ["", "MySQL", "PostgreSQL"], index=0)
+    placeholder_text = ""
+    if db_type == "PostgreSQL":
+        placeholder_text = "postgresql://user:password@host:port/database"
+    elif db_type == "MySQL":
+        placeholder_text = "mysql+pymysql://user:password@host:port/database"
+    
     with st.form('connection_form'):
-        connection_string = st.text_input('Connection String')
-        submit = st.form_submit_button('Connect')
+        connection_string = st.text_input("Connection String", placeholder=placeholder_text, disabled=(db_type == ""))
+        submit = st.form_submit_button("Connect")
         
-        if submit:
-            try:
-                response = requests.post(
-                    'http://localhost:8000/api/v1/setup-connection',
-                    json={'connection_string': connection_string}
-                )
-                if response.status_code == 200:
-                    st.success('Database connected successfully!')
-                    st.session_state.db_connected = True
-                    st.session_state.current_page = 'chat'
-                    st.rerun()
-                else:
-                    st.error(f'Connection failed: {response.text}')
-            except requests.RequestException as e:
-                st.error(f'Error connecting to backend: {str(e)}')
+        if submit and connection_string:
+            response = requests.post('http://localhost:8000/api/v1/setup-connection', json={'connection_string': connection_string})
+            if response.status_code == 200:
+                st.success('Database connected successfully!')
+                st.session_state.current_page = 'chat'
+                st.rerun()
+            else:
+                st.error(f'Connection failed: {response.text}')
 
-# Chat interface page
+# Chat Page
 def chat_page():
     st.title('Chat Interface')
-    
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     
-    # Display chat history
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.write(message["content"])
     
-    # Query input
     query = st.chat_input("Enter your query")
-    
     if query:
-        # Add user message to chat history
         st.session_state.chat_history.append({"role": "user", "content": query})
-        
-        try:
-            response = requests.post(
-                'http://localhost:8000/api/v1/query',
-                json={'query': query}
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                # Add assistant response to chat history
-                st.session_state.chat_history.append({"role": "assistant", "content": result})
-                st.rerun()
-            else:
-                st.error(f'Query failed: {response.text}')
-        except requests.RequestException as e:
-            st.error(f'Error connecting to backend: {str(e)}')
+        response = requests.post('http://localhost:8000/api/v1/query', json={'query': query})
+        if response.status_code == 200:
+            result = response.json().get("result", "No result found")
+            st.session_state.chat_history.append({"role": "assistant", "content": result})
+            st.rerun()
+        else:
+            st.error(f'Query failed: {response.text}')
+    
+    if st.button("End Chat"):
+        st.session_state.current_page = 'db_connection'
+        st.rerun()
 
-# Main app
+# Main Function
 def main():
     init_db()
     init_session_state()
     
-    # Sidebar navigation
-    if st.session_state.logged_in:
-        st.sidebar.title('Navigation')
-        pages = {
-            'Database Connection': 'db_connection',
-            'Chat Interface': 'chat'
-        }
-        
-        selection = st.sidebar.radio('Go to', list(pages.keys()))
-        st.session_state.current_page = pages[selection]
-        
-        st.sidebar.button('Logout', on_click=lambda: logout())
-    
-    # Page routing
     if not st.session_state.logged_in:
         login_page()
     elif st.session_state.current_page == 'db_connection':
         db_connection_page()
     elif st.session_state.current_page == 'chat':
-        if not st.session_state.get('db_connected', False):
-            st.error('Database not connected. Redirecting to Database Connection page')
+        if 'db_connected' not in st.session_state or not st.session_state.db_connected:
             st.session_state.current_page = 'db_connection'
             st.rerun()
         chat_page()
-
-def logout():
-    st.session_state.logged_in = False
-    st.session_state.username = None
-    st.session_state.current_page = 'login'
-    st.session_state.db_connected = False
-    st.rerun()
 
 if __name__ == '__main__':
     main()
