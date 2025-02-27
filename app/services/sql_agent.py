@@ -12,6 +12,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from dotenv import load_dotenv
 import os
+from IPython.display import display
+from PIL import Image
+import os
 load_dotenv()
 
 # Global variables
@@ -24,7 +27,7 @@ get_schema_tool = None
 app = None  # This will store the compiled workflow
 
 # Setting up LLM
-llm = ChatGroq(model="llama3-70b-8192", api_key = "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")
+llm = ChatGroq(model="llama3-70b-8192", api_key = os.getenv("GROQ_API_KEY"))
 
 def setup_database_connection(connection_string: str):
     global db, toolkit, tools, list_tables_tool, sql_db_query, get_schema_tool, app
@@ -192,6 +195,25 @@ def initialize_workflow():
 
     # Compile the workflow into an executable app
     app = workflow.compile()
+    
+
+    # # # Save the graph image as a file
+    # image_path = "workflow_graph.png"
+    # app.get_graph().draw_mermaid_png().save(image_path)
+
+    # Open and display the image
+    # import io
+
+    # # Generate the graph image as bytes
+    # image_bytes = app.get_graph().draw_mermaid_png()
+
+    # # Convert bytes to an Image object
+    # image = Image.open(io.BytesIO(image_bytes))
+
+    # # Save the image to a file
+    # image_path = "workflow_graph.png"
+    # image.save(image_path)
+
 
 @tool
 def query_to_database(query: str) -> str:
