@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Update BASE_URL to use the internal FastAPI service
-BASE_URL = "http://0.0.0.0:8000"  # Use container internal networking
+BASE_URL = "http://localhost:8000"  # Use container internal networking
 
 # Initialize SQLite database
 def init_db():
