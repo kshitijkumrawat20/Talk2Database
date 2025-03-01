@@ -10,12 +10,14 @@ on:
       - 'Dockerfile'
       - 'requirements.txt'
 
+
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: app
 
     steps:
       - name: Checkout repository
@@ -32,6 +34,20 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
         with:
@@ -39,55 +55,29 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Create AWS credentials file
-            mkdir -p ~/.aws
-            cat > ~/.aws/credentials << EOF
-            [default]
-            aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            region = ${{ secrets.AWS_DEFAULT_REGION }}
-            EOF
-
-            # Set proper permissions for AWS credentials
-            chmod 600 ~/.aws/credentials
-
-            # Install Docker if not present
-            sudo dnf update -y
-            sudo dnf install docker -y
-            sudo systemctl start docker
-            sudo systemctl enable docker
-            sudo usermod -aG docker ${{ secrets.EC2_USER }}
-            sudo chmod 666 /var/run/docker.sock
-
-            # Create deployment directory
-            sudo mkdir -p /home/${{ secrets.EC2_USER }}/Talk2SQL/backend
-            sudo chown -R ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} /home/${{ secrets.EC2_USER }}/Talk2SQL
-            cd /home/${{ secrets.EC2_USER }}/Talk2SQL/backend
-
-            # Login to ECR using credentials file
+            # Login to ECR
             aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-
-            # Create docker-compose.yml
-            cat > docker-compose.yml << 'EOL'
+            
+            # Navigate to deployment directory
+            mkdir -p /home/ubuntu/Talk2SQL/backend
+            cd /home/ubuntu/Talk2SQL/backend
+            
+            # Stop and remove the old container
+            docker-compose down
+            
+            # Remove old unused images
+            docker image prune -af
+            
+            # Update docker-compose.yml with latest image
+            echo "version: '3.8'
+            
             services:
               app:
                 image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
                 ports:
-                  - "80:80"
-                  - "8000:8000"
-                environment:
-                  - PYTHONUNBUFFERED=1
-                  - AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-                  - AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  - AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
-                restart: unless-stopped
-            EOL
-
-            # Pull and start containers
+                  - \"80:80\"
+                restart: unless-stopped" > docker-compose.yml
+            
+            # Pull latest image and deploy
             docker-compose pull
             docker-compose up -d
-
-            # Verify deployment
-            sleep 10
-            docker ps
-            docker-compose logs
