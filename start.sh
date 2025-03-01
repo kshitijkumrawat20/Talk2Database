@@ -10,4 +10,4 @@ until curl -s http://localhost:8000/docs > /dev/null; do
 done
 
 # Start Streamlit
-streamlit run app/frontend/Talk2SQL.py --server.port 80 --server.enableCORS false --server.enableXsrfProtection false
+streamlit run app/frontend/Talk2SQL.py --server.port 80 --server.enableCORS false
