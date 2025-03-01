@@ -13,6 +13,5 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
-
 app.include_router(database_connection.router, prefix="/api/v1")
 app.include_router(sql_query.router, prefix="/api/v1")
