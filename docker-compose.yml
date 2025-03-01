@@ -1,15 +1,13 @@
 version: "3.8"
 services:
-  talk2sql:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  app:
+    image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
     ports:
+      - "80:80"
       - "8000:8000"
-      - "8501:8501"
-    volumes:
-      - .:/app
+      - "8501:8501" # Expose Streamlit port
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
-      - BACKEND_CORS_ORIGINS=["*"]
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    command: |
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload & streamlit run /app/frontend/Talk2SQL.py --server.address=0.0.0.0 --server.port=8501
