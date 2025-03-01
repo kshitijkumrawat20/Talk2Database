@@ -4,9 +4,13 @@ import requests
 import hashlib
 import pandas as pd
 from urllib.parse import urljoin
+import logging
 
-# Add base URL configuration
-BASE_URL = "http://localhost:8000"  # Default for local development
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Update BASE_URL to use the internal FastAPI service
+BASE_URL = "http://0.0.0.0:8000"  # Use container internal networking
 
 # Initialize SQLite database
 def init_db():
@@ -147,10 +151,12 @@ def db_connection_page():
         
         if submit and connection_string:
             try:
+                logger.info(f"Attempting to connect to backend at {BASE_URL}")
                 response = requests.post(
                     urljoin(BASE_URL, '/api/v1/setup-connection'),
                     json={'connection_string': connection_string}
                 )
+                logger.info(f"Response status: {response.status_code}")
                 if response.status_code == 200:
                     st.success('Database connected successfully!')
                     st.session_state.db_connected = True
@@ -159,6 +165,7 @@ def db_connection_page():
                 else:
                     st.error(f'Connection failed: {response.text}')
             except requests.RequestException as e:
+                logger.error(f"Connection error: {str(e)}")
                 st.error(f'Error connecting to backend: {str(e)}')
                 
 # Chat interface page
