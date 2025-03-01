@@ -1,59 +1,108 @@
-name: Deploy to AWS
+name: Deploy Backend to AWS
 
 on:
   push:
     branches:
-      - main # or your main branch name
+      - main
+    paths:
+      - 'app/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - 'requirements.txt'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-      AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
-      EC2_HOST: ${{ secrets.EC2_HOST }}
-      EC2_USER: ${{ secrets.EC2_USER }}
-      SSH_KEY_NAME: your-ssh-key # The name of your SSH key file (without the .pem extension)
+    defaults:
+      run:
+        working-directory: backend  # This might need to be adjusted
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: List files
-        run: ls -la
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build, tag, and push image to Amazon ECR
-        id: build-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: latest
-        run: |
-          docker build -t $ECR_REPOSITORY -f Dockerfile .
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Update EC2 instance
-        run: |
-          # Create SSH directory and key file
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/${{ env.SSH_KEY_NAME }}.pem
-          chmod 400 ~/.ssh/${{ env.SSH_KEY_NAME }}.pem
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-          # Stop the old container, remove it, pull the new image, and run the new container
-          ssh -i ~/.ssh/${{ env.SSH_KEY_NAME }}.pem ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
-            docker stop talk2sql || true;
-            docker rm talk2sql || true;
-            docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest;
-            docker run -d -p 80:8000 -p 8501:8501 --name talk2sql -p 80:8000 -p 8501:8501 ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
-          "
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Install Docker for AL2023
+            sudo dnf update -y
+            sudo dnf install docker -y
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -aG docker ${{ secrets.EC2_USER }}
+
+            # Install Docker Compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+
+            # Reload shell to apply docker group
+            newgrp docker
+
+            # Install AWS CLI
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -o awscliv2.zip
+            sudo ./aws/install --update
+
+            # Configure AWS CLI
+            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws configure set region ${{ secrets.AWS_DEFAULT_REGION }}
+
+            # Login to ECR
+            aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+            # Setup deployment directory
+            mkdir -p /home/${{ secrets.EC2_USER }}/Talk2SQL/backend
+            cd /home/${{ secrets.EC2_USER }}/Talk2SQL/backend
+
+            # Create docker-compose.yml
+            cat > docker-compose.yml << 'EOL'
+            services:
+              app:
+                image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+                ports:
+                  - "80:80"
+                  - "8000:8000"
+                  - "8501:8501" # Expose Streamlit port
+                environment:
+                  - PYTHONUNBUFFERED=1
+                restart: unless-stopped
+            EOL
+
+            # Deploy
+            docker-compose pull
+            docker-compose up -d
+
+            # Verify deployment
+            sleep 10
+            docker ps
+            docker-compose logs
