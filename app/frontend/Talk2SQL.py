@@ -3,15 +3,6 @@ import sqlite3
 import requests
 import hashlib
 import pandas as pd
-from urllib.parse import urljoin
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Update BASE_URL to use the internal FastAPI service
-BASE_URL = "http://localhost:8000"  # Use container internal networking
-
 # Initialize SQLite database
 def init_db():
     conn = sqlite3.connect('users.db')
@@ -62,15 +53,15 @@ def login_page():
     st.set_page_config(page_title="Talk2SQL👨🏼‍💻🛢", layout="wide")
     st.header('Talk2SQL👨🏼‍💻🛢')
     st.title('Login / Sign Up')
-    
+
     tab1, tab2 = st.tabs(['Login', 'Sign Up'])
-    
+
     with tab1:
         with st.form('login_form'):
             username = st.text_input('Username')
             password = st.text_input('Password', type='password')
             submit = st.form_submit_button('Login')
-            
+
             if submit:
                 if authenticate_user(username, password):
                     st.session_state.logged_in = True
@@ -79,14 +70,14 @@ def login_page():
                     st.rerun()
                 else:
                     st.error('Invalid username or password')
-    
+
     with tab2:
         with st.form('signup_form'):
             new_username = st.text_input('Username')
             new_password = st.text_input('Password', type='password')
             confirm_password = st.text_input('Confirm Password', type='password')
             submit = st.form_submit_button('Sign Up')
-            
+
             if submit:
                 if new_password != confirm_password:
                     st.error('Passwords do not match')
@@ -100,16 +91,16 @@ def db_connection_page():
     st.set_page_config(page_title="Talk2SQL👨🏼‍💻🛢", layout="wide")
     st.header('Talk2SQL👨🏼‍💻🛢')
     st.title('Database Connection')
-    
+
     # Sidebar content
     with st.sidebar:
         st.header("Sample Data")
-        
+
         # Sample connection string
         st.subheader("Sample Connection String")
         st.sidebar.subheader("Sample Connection String")
         st.sidebar.code("mysql+pymysql://admin:9522359448@mydatabase.cf8u2cy0a4h6.us-east-1.rds.amazonaws.com:3306/mydb")
-        
+
         st.sidebar.subheader("Sample Table")
         sample_data = pd.DataFrame({
             "id": [1, 2, 3, 4],
@@ -120,7 +111,7 @@ def db_connection_page():
             "salary": [50000, 60000, 70000, 80000]
         })
         st.sidebar.dataframe(sample_data)
-        
+
         # Sample questions
         st.subheader("Sample Questions")
         questions = [
@@ -130,12 +121,12 @@ def db_connection_page():
         ]
         for q in questions:
             st.markdown(f"- {q}")
-        
+
         # Logout button
         st.divider()
         if st.button("Logout", type="primary"):
             logout()
-    
+
     # Main content
     db_options = ["MySQL", "PostgreSQL"]
     db_type = st.selectbox("Select Database Type", db_options)
@@ -144,19 +135,17 @@ def db_connection_page():
         placeholder_text = "postgresql://user:password@host:port/database"
     elif db_type == "MySQL":
         placeholder_text = "mysql+pymysql://user:password@host:port/database"
-    
+
     with st.form('connection_form'):
         connection_string = st.text_input('Connection String', placeholder=placeholder_text, disabled=not db_type)
         submit = st.form_submit_button('Connect')
-        
+
         if submit and connection_string:
             try:
-                logger.info(f"Attempting to connect to backend at {BASE_URL}")
                 response = requests.post(
-                    urljoin(BASE_URL, '/api/v1/setup-connection'),
+                    'http://localhost:8000/api/v1/setup-connection',
                     json={'connection_string': connection_string}
                 )
-                logger.info(f"Response status: {response.status_code}")
                 if response.status_code == 200:
                     st.success('Database connected successfully!')
                     st.session_state.db_connected = True
@@ -165,32 +154,31 @@ def db_connection_page():
                 else:
                     st.error(f'Connection failed: {response.text}')
             except requests.RequestException as e:
-                logger.error(f"Connection error: {str(e)}")
                 st.error(f'Error connecting to backend: {str(e)}')
-                
+
 # Chat interface page
 def chat_page():
     st.set_page_config(page_title="Talk2SQL👨🏼‍💻🛢", layout="wide")
     st.title('Chat Interface')
-    
+
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
-    
+
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.write(message["content"])
-    
+
     query = st.chat_input("Enter your query")
-    
+
     if query:
         st.session_state.chat_history.append({"role": "user", "content": query})
-        
+
         try:
             response = requests.post(
-                urljoin(BASE_URL, '/api/v1/query'),
+                'http://localhost:8000/api/v1/query',
                 json={'query': query}
             )
-            
+
             if response.status_code == 200:
                 result = response.json().get("result", "No result")
                 st.session_state.chat_history.append({"role": "assistant", "content": result})
@@ -199,7 +187,7 @@ def chat_page():
                 st.error(f'Query failed: {response.text}')
         except requests.RequestException as e:
             st.error(f'Error connecting to backend: {str(e)}')
-    
+
     if st.button("End Chat"):
         st.session_state.current_page = 'db_connection'
         st.rerun()
@@ -208,7 +196,7 @@ def chat_page():
 def main():
     init_db()
     init_session_state()
-    
+
     if not st.session_state.logged_in:
         login_page()
     elif st.session_state.current_page == 'db_connection':
