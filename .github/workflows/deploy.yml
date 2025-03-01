@@ -39,39 +39,35 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Install Docker for AL2023
+            # Create AWS credentials file
+            mkdir -p ~/.aws
+            cat > ~/.aws/credentials << EOF
+            [default]
+            aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            region = ${{ secrets.AWS_DEFAULT_REGION }}
+            EOF
+
+            # Set proper permissions for AWS credentials
+            chmod 600 ~/.aws/credentials
+
+            # Install Docker if not present
             sudo dnf update -y
             sudo dnf install docker -y
             sudo systemctl start docker
             sudo systemctl enable docker
-            
-            # Add current user to docker group and set permissions
             sudo usermod -aG docker ${{ secrets.EC2_USER }}
             sudo chmod 666 /var/run/docker.sock
-            
-            # Install Docker Compose
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-            
-            # Install AWS CLI
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip -o awscliv2.zip
-            sudo ./aws/install --update
-            
-            # Configure AWS CLI
-            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws configure set region ${{ secrets.AWS_DEFAULT_REGION }}
-            
-            # Create deployment directory with proper permissions
+
+            # Create deployment directory
             sudo mkdir -p /home/${{ secrets.EC2_USER }}/Talk2SQL/backend
             sudo chown -R ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} /home/${{ secrets.EC2_USER }}/Talk2SQL
             cd /home/${{ secrets.EC2_USER }}/Talk2SQL/backend
-            
-            # Login to ECR with sudo
-            sudo aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | sudo docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-            
-            # Create docker-compose.yml with proper permissions
+
+            # Login to ECR using credentials file
+            aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+            # Create docker-compose.yml
             cat > docker-compose.yml << 'EOL'
             services:
               app:
@@ -81,14 +77,17 @@ jobs:
                   - "8000:8000"
                 environment:
                   - PYTHONUNBUFFERED=1
+                  - AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+                  - AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  - AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
                 restart: unless-stopped
             EOL
-            
-            # Deploy with sudo
-            sudo docker-compose pull
-            sudo docker-compose up -d
-            
+
+            # Pull and start containers
+            docker-compose pull
+            docker-compose up -d
+
             # Verify deployment
             sleep 10
-            sudo docker ps
-            sudo docker-compose logs
+            docker ps
+            docker-compose logs
