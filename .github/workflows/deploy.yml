@@ -74,8 +74,29 @@ jobs:
                 image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
                 ports:
                   - \"80:80\"
-                restart: unless-stopped" > docker-compose.yml
+                  - \"8000:8000\"
+                environment:
+                  - PYTHONUNBUFFERED=1
+                volumes:
+                  - /home/ubuntu/Talk2SQL/backend/app:/app
+                healthcheck:
+                  test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+                restart: unless-stopped
             
-            # Pull latest image and deploy
+            networks:
+              default:
+                driver: bridge" > docker-compose.yml
+            
+            # Create app directory and copy files
+            mkdir -p /home/ubuntu/Talk2SQL/backend/app
+            
+            # Pull latest image and deploy with logs
             docker-compose pull
             docker-compose up -d
+            
+            # Wait for container to start and show logs
+            sleep 5
+            docker-compose logs
