@@ -1,26 +1,11 @@
-version: '3.8'
-
 services:
-  backend:
-    image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+  app:
+    image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest  # Pull image from ECR
     ports:
-      - "8000:8000"
+      - "80:80"  # Maps container port 80 (Streamlit frontend) to host port 80. Backend runs internally on port 8000
+      - "8000:8000"  # Add this line to expose the FastAPI port
     networks:
       - app_network
-    restart: unless-stopped
-
-  frontend:
-    image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
-    command: streamlit run app/frontend/Talk2SQL.py --server.port 80 --server.address 0.0.0.0
-    environment:
-      - BACKEND_URL=http://backend:8000
-    ports:
-      - "80:80"
-    networks:
-      - app_network
-    depends_on:
-      - backend
     restart: unless-stopped
 
 networks:
