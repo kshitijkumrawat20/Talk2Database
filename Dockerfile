@@ -5,10 +5,10 @@ WORKDIR /app
 # Copy requirements first
 COPY requirements.txt .
 
-# Disable pip cache and force reinstall
-RUN pip install --no-cache-dir --force-reinstall -r requirements.txt
+# Clean pip cache and install dependencies
+RUN pip cache purge && \
+    pip install --no-cache-dir --force-reinstall -r requirements.txt
 
-# Copy the application code
 COPY . .
 
 EXPOSE 80 8000
