@@ -143,7 +143,7 @@ def db_connection_page():
         if submit and connection_string:
             try:
                 response = requests.post(
-                    'http://localhost:8000/api/v1/setup-connection',
+                    '/api/v1/setup-connection',
                     json={'connection_string': connection_string}
                 )
                 if response.status_code == 200:
@@ -175,7 +175,7 @@ def chat_page():
         
         try:
             response = requests.post(
-                'http://localhost:8000/api/v1/query',
+                '/api/v1/query',
                 json={'query': query}
             )
             
