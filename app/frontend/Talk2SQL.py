@@ -3,6 +3,11 @@ import sqlite3
 import requests
 import hashlib
 import pandas as pd
+from urllib.parse import urljoin
+
+# Add base URL configuration
+BASE_URL = "http://localhost:8000"  # Default for local development
+
 # Initialize SQLite database
 def init_db():
     conn = sqlite3.connect('users.db')
@@ -143,7 +148,7 @@ def db_connection_page():
         if submit and connection_string:
             try:
                 response = requests.post(
-                    '/api/v1/setup-connection',
+                    urljoin(BASE_URL, '/api/v1/setup-connection'),
                     json={'connection_string': connection_string}
                 )
                 if response.status_code == 200:
@@ -175,7 +180,7 @@ def chat_page():
         
         try:
             response = requests.post(
-                '/api/v1/query',
+                urljoin(BASE_URL, '/api/v1/query'),
                 json={'query': query}
             )
             
