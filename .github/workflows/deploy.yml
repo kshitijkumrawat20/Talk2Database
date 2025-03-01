@@ -52,5 +52,5 @@ jobs:
             docker stop talk2sql || true;
             docker rm talk2sql || true;
             docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest;
-            docker run -d -p 80:8000 -p 8501:8501 --name talk2sql ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+            docker run -d -p 80:8000 -p 8501:8501 --name talk2sql -p 80:8000 -p 8501:8501 ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
           "
