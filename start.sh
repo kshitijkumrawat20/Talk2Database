@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Start FastAPI in the background
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 &
 
 # # Wait for FastAPI to be available
 # until curl -s http://localhost:8000/docs > /dev/null; do
