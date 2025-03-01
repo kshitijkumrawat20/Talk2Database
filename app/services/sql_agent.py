@@ -257,18 +257,13 @@ from dotenv import load_dotenv
 import os
 from IPython.display import display
 import PIL
-import io
 from langgraph.errors import GraphRecursionError
-from langgraph.graph import StateGraph, START, END
-
 import os
 import io
 from typing import Annotated, Any, TypedDict
 
 from IPython.display import Image, display
 from langchain_core.runnables.graph import MermaidDrawMethod
-
-# Added for more robust tool call handling
 from typing import Optional
 
 class SQLAgent:
