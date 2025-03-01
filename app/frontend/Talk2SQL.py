@@ -1,8 +1,20 @@
+import os
 import streamlit as st
 import sqlite3
 import requests
 import hashlib
 import pandas as pd
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Get backend URL from environment variable, fallback to localhost for local development
+BACKEND_URL = os.getenv('BACKEND_URL', 'http://localhost:8000')
+
+logger.info(f"Using backend URL: {BACKEND_URL}")
+
 # Initialize SQLite database
 def init_db():
     conn = sqlite3.connect('users.db')
@@ -141,20 +153,31 @@ def db_connection_page():
         submit = st.form_submit_button('Connect')
 
         if submit and connection_string:
-            try:
-                response = requests.post(
-                    'http://localhost:8000/api/v1/setup-connection',
-                    json={'connection_string': connection_string}
-                )
-                if response.status_code == 200:
-                    st.success('Database connected successfully!')
-                    st.session_state.db_connected = True
-                    st.session_state.current_page = 'chat'
-                    st.rerun()
-                else:
-                    st.error(f'Connection failed: {response.text}')
-            except requests.RequestException as e:
-                st.error(f'Error connecting to backend: {str(e)}')
+            response = setup_connection(connection_string)
+            if "error" in response:
+                st.error(f'Connection failed: {response["error"]}')
+            else:
+                st.success('Database connected successfully!')
+                st.session_state.db_connected = True
+                st.session_state.current_page = 'chat'
+                st.rerun()
+
+def setup_connection(connection_string):
+    try:
+        api_url = f"{BACKEND_URL}/api/v1/setup-connection"
+        logger.info(f"Making request to: {api_url}")
+        
+        response = requests.post(
+            api_url,
+            json={"connection_string": connection_string},
+            timeout=10
+        )
+        response.raise_for_status()
+        logger.info(f"Response status: {response.status_code}")
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error connecting to backend: {str(e)}")
+        return {"error": str(e)}
 
 # Chat interface page
 def chat_page():
