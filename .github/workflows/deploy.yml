@@ -13,9 +13,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend  # This might need to be adjusted
 
     steps:
       - name: Checkout repository
@@ -53,29 +50,26 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Install Docker for AL2023
-            sudo dnf update -y
-            sudo dnf install docker -y
+            # Install Docker for Ubuntu
+            sudo apt-get update -y
+            sudo apt-get install docker.io -y
             sudo systemctl start docker
             sudo systemctl enable docker
             sudo usermod -aG docker ${{ secrets.EC2_USER }}
 
             # Install Docker Compose
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-
-            # Reload shell to apply docker group
-            newgrp docker
+            sudo apt-get install docker-compose -y
 
             # Install AWS CLI
+            sudo apt-get install unzip -y
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             unzip -o awscliv2.zip
             sudo ./aws/install --update
 
-            # Configure AWS CLI
-            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws configure set region ${{ secrets.AWS_DEFAULT_REGION }}
+            # Configure AWS CLI (Non-interactive)
+            export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            export AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}
 
             # Login to ECR
             aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
