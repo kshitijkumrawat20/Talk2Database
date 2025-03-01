@@ -1,0 +1,15 @@
+version: "3.8"
+services:
+  talk2sql:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+      - "8501:8501"
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
+      - BACKEND_CORS_ORIGINS=["*"]
