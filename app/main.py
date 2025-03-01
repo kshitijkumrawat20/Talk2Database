@@ -10,7 +10,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_origins=["*"],  # Allow all origin
     allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  #
+    allow_headers=["*"],  # Allow all headers
 )
 
 app.include_router(database_connection.router, prefix="/api/v1")
