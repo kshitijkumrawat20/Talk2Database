@@ -53,27 +53,36 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Install Docker if not installed
-            if ! command -v docker &> /dev/null; then
-              sudo yum update -y
-              sudo amazon-linux-extras install docker -y
-              sudo service docker start
-              sudo usermod -a -G docker ec2-user
-              sudo chkconfig docker on
-            fi
+            # Install Docker for AL2023
+            sudo dnf update -y
+            sudo dnf install docker -y
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -aG docker ${{ secrets.EC2_USER }}
             
-            # Install Docker Compose if not installed
-            if ! command -v docker-compose &> /dev/null; then
-              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-              sudo chmod +x /usr/local/bin/docker-compose
-            fi
+            # Install Docker Compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            
+            # Reload shell to apply docker group
+            newgrp docker
+            
+            # Install AWS CLI
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -o awscliv2.zip
+            sudo ./aws/install --update
+            
+            # Configure AWS CLI
+            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws configure set region ${{ secrets.AWS_DEFAULT_REGION }}
             
             # Login to ECR
             aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
             
             # Setup deployment directory
-            mkdir -p /home/ec2-user/Talk2SQL/backend
-            cd /home/ec2-user/Talk2SQL/backend
+            mkdir -p /home/${{ secrets.EC2_USER }}/Talk2SQL/backend
+            cd /home/${{ secrets.EC2_USER }}/Talk2SQL/backend
             
             # Create docker-compose.yml
             cat > docker-compose.yml << 'EOL'
@@ -93,5 +102,6 @@ jobs:
             docker-compose up -d
             
             # Verify deployment
+            sleep 10
             docker ps
             docker-compose logs
