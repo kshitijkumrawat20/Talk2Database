@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: app
+        working-directory: backend
 
     steps:
       - name: Checkout repository
@@ -53,50 +53,45 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Install Docker if not installed
+            if ! command -v docker &> /dev/null; then
+              sudo yum update -y
+              sudo amazon-linux-extras install docker -y
+              sudo service docker start
+              sudo usermod -a -G docker ec2-user
+              sudo chkconfig docker on
+            fi
+            
+            # Install Docker Compose if not installed
+            if ! command -v docker-compose &> /dev/null; then
+              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+            fi
+            
             # Login to ECR
             aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
             
-            # Navigate to deployment directory
-            mkdir -p /home/ubuntu/Talk2SQL/backend
-            cd /home/ubuntu/Talk2SQL/backend
+            # Setup deployment directory
+            mkdir -p /home/ec2-user/Talk2SQL/backend
+            cd /home/ec2-user/Talk2SQL/backend
             
-            # Stop and remove the old container
-            docker-compose down
-            
-            # Remove old unused images
-            docker image prune -af
-            
-            # Update docker-compose.yml with latest image
-            echo "version: '3.8'
-            
+            # Create docker-compose.yml
+            cat > docker-compose.yml << 'EOL'
             services:
               app:
                 image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
                 ports:
-                  - \"80:80\"
-                  - \"8000:8000\"
+                  - "80:80"
+                  - "8000:8000"
                 environment:
                   - PYTHONUNBUFFERED=1
-                volumes:
-                  - /home/ubuntu/Talk2SQL/backend/app:/app
-                healthcheck:
-                  test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
-                  interval: 30s
-                  timeout: 10s
-                  retries: 3
                 restart: unless-stopped
+            EOL
             
-            networks:
-              default:
-                driver: bridge" > docker-compose.yml
-            
-            # Create app directory and copy files
-            mkdir -p /home/ubuntu/Talk2SQL/backend/app
-            
-            # Pull latest image and deploy with logs
+            # Deploy
             docker-compose pull
             docker-compose up -d
             
-            # Wait for container to start and show logs
-            sleep 5
+            # Verify deployment
+            docker ps
             docker-compose logs
