@@ -283,7 +283,7 @@ class SQLAgent:
         self.app = None
         
         # Setting up LLM
-        self.llm = ChatGroq(model=model, api_key=os.getenv("GROQ_API_KEY"))
+        self.llm = ChatGroq(model=model, api_key="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")
         
         # Register the tool method
         self.query_to_database = self._create_query_tool()
