@@ -3,7 +3,7 @@ services:
   app:
     image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
     ports:
-      - "80:8080"  # Map host port 80 to container port 8080
+      - "80:80"  # Map host port 80 to container port 80
       - "8000:8000"
       - "8501:8501" # Expose Streamlit port
     environment:
