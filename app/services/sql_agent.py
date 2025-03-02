@@ -525,7 +525,7 @@ class SQLAgent:
         # First, handle simple queries like "list tables" directly
         query_lower = query.lower()
         if any(phrase in query_lower for phrase in ["list all the tables", "show tables", "name of tables",
-                                                    "which tables are present", "how many tables"]):
+                                                    "which tables are present", "how many tables", "list all tables"]):
             if self.list_tables_tool:
                 tables = self.list_tables_tool.invoke("")
                 return f"The tables in the database are: {tables}"
