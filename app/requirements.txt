@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+langchain
+langgraph
+langchain-groq
+pydantic
+sqlalchemy
+pymysql
+langchain-community
+langchain-core  
+streamlit
+pandas
+IPython
+ipykernel
