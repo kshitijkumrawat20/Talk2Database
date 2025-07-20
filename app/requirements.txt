@@ -12,3 +12,6 @@ streamlit
 pandas
 IPython
 ipykernel
+passlib
+python-multipart
+bcrypt==4.3.0

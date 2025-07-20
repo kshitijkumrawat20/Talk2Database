@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.endpoints import sql_query, database_connection
+from app.api.v1 import auth
 
 app = FastAPI()
 
@@ -15,3 +16,4 @@ app.add_middleware(
 
 app.include_router(database_connection.router, prefix="/api/v1")
 app.include_router(sql_query.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1/auth")
