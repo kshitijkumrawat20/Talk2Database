@@ -373,7 +373,7 @@ class SQLAgent:
         self.app = None
         
         # Setting up LLM
-        self.llm = ChatGroq(model=model)
+        self.llm = ChatGroq(model=model,api_key = os.getenv("GROQ_API_KEY"))
         
         # Register the tool method
         self.query_to_database = self._create_query_tool()
@@ -714,7 +714,7 @@ class SQLAgent:
             SQL Query: {query}
             Query Result: {result}
             
-            Provide a natural language answer that directly addresses the user's question."""
+            Provide a natural language answer that directly addresses the user's question. Make sure to provide only answer to human question, no any internal process results and explaination, just answer related to the human query."""
             
             try:
                 response = self.llm.invoke([HumanMessage(content=response_prompt)])
