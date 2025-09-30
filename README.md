@@ -7,7 +7,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com)
 [![AWS](https://img.shields.io/badge/AWS-Deployed-orange.svg)](https://aws.amazon.com)
 
-A powerful Agentic-Ai application that converts natural language queries into SQL commands and executes them against your database. Built with FastAPI, Streamlit, and LangChain, Talk2Database makes database interaction accessible to everyone, regardless of their SQL expertise.
+A powerful Agentic-Ai application that converts natural language queries into SQL commands and executes them against your database. Built with FastAPI, Streamlit, and Langgraph and LangChain Tools, Talk2Database makes database interaction accessible to everyone, regardless of their SQL expertise.
 
 ## 🚀 Features
 
