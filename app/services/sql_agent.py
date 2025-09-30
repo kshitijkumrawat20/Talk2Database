@@ -352,13 +352,17 @@ from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.pydantic_v1 import BaseModel, Field
+# from langchain_core.pydantic_v1 import BaseModel, Field
 from langgraph.graph import StateGraph, END, MessagesState
 from typing import TypedDict, Annotated, List, Literal, Dict, Any
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 from dotenv import load_dotenv
 load_dotenv()
 import os
 os.environ["GROQ_API_KEY"]=os.getenv("GROQ_API_KEY")
+os.environ["GEMINI_API_KEY"]=os.getenv("GEMINI_API_KEY")
+
 
 class SQLAgent:
     def __init__(self, model="llama3-70b-8192"):
@@ -373,8 +377,8 @@ class SQLAgent:
         self.app = None
         
         # Setting up LLM
-        self.llm = ChatGroq(model=model,api_key = os.getenv("GROQ_API_KEY"))
-        
+        # self.llm = ChatGroq(model=model,api_key = os.getenv("GROQ_API_KEY"))
+        self.llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", google_api_key=os.environ["GEMINI_API_KEY"])
         # Register the tool method
         self.query_to_database = self._create_query_tool()
 
@@ -784,6 +788,7 @@ class SQLAgent:
 
         # Compile the graph
         self.app = workflow.compile()
+        # self.app.get_graph().draw_mermaid_png(output_file_path="sql_agent_workflow.png", draw_method=MermaidDrawMethod.API)
                 
                 
   
