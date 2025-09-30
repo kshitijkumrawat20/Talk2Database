@@ -27,7 +27,7 @@ Talk2Database follows a modern microservices architecture with clear separation 
 
 ### Workflow Diagram
 
-![Workflow Diagram](@/workflow_graph.png)
+![Workflow Diagram](https://github.com/kshitijkumrawat20/Talk2Database/blob/main/sql_agent_workflow.png)
 
 The application workflow consists of the following steps:
 
