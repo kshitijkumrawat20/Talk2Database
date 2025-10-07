@@ -664,6 +664,9 @@ class SQLAgent:
             
             try:
                 checked_query = self.query_checker_tool.invoke(query)
+                ## if checked query contains ``` anywhere remove it 
+                if "```" in checked_query:
+                    checked_query = checked_query.replace("```", "")
                 print(f"Query checked: {checked_query}")
                 return {
                     "messages": [AIMessage(content=f"Query checked: {checked_query}")],
