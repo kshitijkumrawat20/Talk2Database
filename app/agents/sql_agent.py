@@ -1,43 +1,27 @@
 
-from langchain_community.utilities import SQLDatabase
 from langchain_groq import ChatGroq
-from langgraph.graph import StateGraph, END, START
+from langgraph.graph import StateGraph, END, START, MessagesState
 from langchain_core.messages import AIMessage, ToolMessage, AnyMessage, HumanMessage
-from langgraph.graph.message import AnyMessage, add_messages
+from langgraph.graph.message import add_messages
 from langchain_core.tools import tool
-from typing import Annotated, Literal, TypedDict, Any
+from typing import Annotated, Literal, TypedDict, Any, Optional, Dict, List
 from pydantic import BaseModel, Field
 from langchain_core.runnables import RunnableLambda, RunnableWithFallbacks
 from langgraph.prebuilt import ToolNode
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
+from langchain_community.utilities import SQLDatabase
 from dotenv import load_dotenv
 import os
-from IPython.display import display
+from IPython.display import display, Image
 import PIL
 from langgraph.errors import GraphRecursionError
-import os
 import io
-from typing import Annotated, Any, TypedDict
-from langgraph.graph import StateGraph, END, MessagesState
-
-from IPython.display import Image, display
 from langchain_core.runnables.graph import MermaidDrawMethod
-from typing import Optional, Dict
-
-from langchain_community.utilities import SQLDatabase
-from langchain_community.agent_toolkits import SQLDatabaseToolkit
-from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.prompts import ChatPromptTemplate
-# from langchain_core.pydantic_v1 import BaseModel, Field
-from langgraph.graph import StateGraph, END, MessagesState
-from typing import TypedDict, Annotated, List, Literal, Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
 from app.schemas.agent_state import DBQuery, SQLAgentState
 from app.tools.database_tools import DatabaseTools
 from app.utils.database_connection import DatabaseConnection
-from dotenv import load_dotenv
 load_dotenv()
 import os
 os.environ["GROQ_API_KEY"]=os.getenv("GROQ_API_KEY")
@@ -102,6 +86,10 @@ class SQLAgent:
         def creating_sql_agent_chain():
             """Creating a sql agent chain"""
 
+            # 4. check_query - Check if the query is correct
+            # - Query checked: {check_query}
+            # If query generated but not checked, respond with 'check_query'.
+            #     If query checked but not executed, respond with 'execute_query'.
             print("Creating a sql agent chain")
             sql_agent_prompt = ChatPromptTemplate.from_messages([
                 ("system", """You are a supervisor SQL agent managing tools to get the answer to the user's query.
@@ -110,23 +98,21 @@ class SQLAgent:
                 1. list_table_tools - List all tables from the database
                 2. get_schema - Get the schema of required tables
                 3. generate_query - Generate a SQL query
-                4. check_query - Check if the query is correct
-                5. execute_query - Execute the query
-                6. response - Create response for the user
                 
+                4. execute_query - Execute the query
+                5. response - Create response for the user
+
                 Current state:
                 - Tables listed: {tables_list}
                 - Schema retrieved: {schema_of_table}
                 - Query generated: {query_gen}
-                - Query checked: {check_query}
                 - Query executed: {execute_query}
                 - Response created: {response_to_user}
                 
                 If no tables are listed, respond with 'list_table_tools'.
                 If tables are listed but no schema, respond with 'get_schema'.
                 If schema exists but no query generated, respond with 'generate_query'.
-                If query generated but not checked, respond with 'check_query'.
-                If query checked but not executed, respond with 'execute_query'.
+                If query generated but not executed, respond with 'execute_query'.
                 If query executed but no response, respond with 'response'.
                 If everything is complete, respond with 'DONE'.
                 
@@ -149,11 +135,11 @@ class SQLAgent:
             tables_list = bool(state.get("tables_list", "").strip())
             schema_of_table = bool(state.get("schema_of_table", "").strip())
             query_gen = bool(state.get("query_gen", "").strip())
-            check_query = bool(state.get("check_query", "").strip())
+            # check_query = bool(state.get("check_query", "").strip())
             execute_query = bool(state.get("execute_query", "").strip())
             response_to_user = bool(state.get("response_to_user", "").strip())
             
-            print(f"State check - Tables: {tables_list}, Schema: {schema_of_table}, Query: {query_gen}, Check: {check_query}, Execute: {execute_query}, Response: {response_to_user}")
+            # print(f"State check - Tables: {tables_list}, Schema: {schema_of_table}, Query: {query_gen}, Check: {check_query}, Execute: {execute_query}, Response: {response_to_user}")
             
             chain = creating_sql_agent_chain()
             decision = chain.invoke({
@@ -161,7 +147,7 @@ class SQLAgent:
                 "tables_list": tables_list,
                 "schema_of_table": schema_of_table,
                 "query_gen": query_gen,
-                "check_query": check_query,
+                # "check_query": check_query,
                 "execute_query": execute_query,
                 "response_to_user": response_to_user
             })
@@ -180,9 +166,9 @@ class SQLAgent:
             elif "generate_query" in decision_text:
                 next_tool = "generate_query"
                 agent_msg = "📋 SQL Agent: Generating SQL query."
-            elif "check_query" in decision_text:
-                next_tool = "check_query"
-                agent_msg = "📋 SQL Agent: Checking SQL query."
+            # elif "check_query" in decision_text:
+            #     next_tool = "check_query"
+            #     agent_msg = "📋 SQL Agent: Checking SQL query."
             elif "execute_query" in decision_text:
                 next_tool = "execute_query"
                 agent_msg = "📋 SQL Agent: Executing query."
@@ -208,9 +194,13 @@ class SQLAgent:
             if next_tool == "end" or state.get("task_complete", False):
                 return END
             
+            # valid_tools = [
+            #     "sql_agent", "list_table_tools", "get_schema", "generate_query",
+            #     "check_query", "execute_query", "response"
+            # ]
             valid_tools = [
                 "sql_agent", "list_table_tools", "get_schema", "generate_query",
-                "check_query", "execute_query", "response"
+                "execute_query", "response"
             ]
             
             return next_tool if next_tool in valid_tools else "sql_agent"
@@ -223,7 +213,7 @@ class SQLAgent:
         workflow.add_node("list_table_tools", self.db_tools.list_table_tools)
         workflow.add_node("get_schema", self.db_tools.get_schema)
         workflow.add_node("generate_query", self.db_tools.generate_query)
-        workflow.add_node("check_query", self.db_tools.check_query)
+        # workflow.add_node("check_query", self.db_tools.check_query)
         workflow.add_node("execute_query", self.db_tools.execute_query)
         workflow.add_node("response", self.db_tools.create_response)
 
@@ -231,7 +221,8 @@ class SQLAgent:
         workflow.set_entry_point("sql_agent")
 
         # Add routing
-        for node in ["sql_agent", "list_table_tools", "get_schema", "generate_query", "check_query", "execute_query", "response"]:
+        # for node in ["sql_agent", "list_table_tools", "get_schema", "generate_query", "check_query", "execute_query", "response"]:
+        for node in ["sql_agent", "list_table_tools", "get_schema", "generate_query", "execute_query", "response"]:
             workflow.add_conditional_edges(
                 node,
                 router,
@@ -240,7 +231,7 @@ class SQLAgent:
                     "list_table_tools": "list_table_tools",
                     "get_schema": "get_schema",
                     "generate_query": "generate_query",
-                    "check_query": "check_query",
+                    # "check_query": "check_query",
                     "execute_query": "execute_query",
                     "response": "response",
                     END: END

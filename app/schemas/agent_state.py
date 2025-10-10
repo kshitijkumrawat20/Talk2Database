@@ -7,7 +7,7 @@ class SQLAgentState(MessagesState):
     tables_list: str = ""
     schema_of_table: str = ""
     query_gen : str= ""
-    check_query: str = ""
+    # check_query: str = ""
     execute_query : str = ""
     task_complete: bool = False
     response_to_user: str= ""
