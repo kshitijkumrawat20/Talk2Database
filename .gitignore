@@ -21,6 +21,8 @@ dist/
 .DS_Store
 Thumbs.db
 sql_agent.txt
+app/core
+app/core/
 
 # Logs
 *.log
