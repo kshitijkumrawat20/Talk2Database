@@ -38,8 +38,7 @@ class SQLAgent:
         self.list_tables_tool = None
         self.sql_db_query = None
         self.get_schema_tool = None
-        self.app = None
-        
+
         # Setting up LLM
         # self.llm = ChatGroq(model=model,api_key = os.getenv("GROQ_API_KEY"))
         self.llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", google_api_key=os.environ["GEMINI_API_KEY"])
