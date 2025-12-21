@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "bcrypt==4.0.1",
+    "deepagents>=0.3.0",
     "fastapi>=0.116.1",
     "ipykernel>=6.29.5",
     "ipython>=9.4.0",

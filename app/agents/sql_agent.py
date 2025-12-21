@@ -6,8 +6,6 @@ from langgraph.graph.message import add_messages
 from langchain_core.tools import tool
 from typing import Annotated, Literal, TypedDict, Any, Optional, Dict, List
 from pydantic import BaseModel, Field
-from langchain_core.runnables import RunnableLambda, RunnableWithFallbacks
-from langgraph.prebuilt import ToolNode
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from langchain_community.utilities import SQLDatabase
@@ -22,6 +20,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from app.schemas.agent_state import DBQuery, SQLAgentState
 from app.tools.database_tools import DatabaseTools
 from app.utils.database_connection import DatabaseConnection
+from langchain_core.prompts import PromptTemplate
+from langchain_experimental.utilities import PythonREPL
 load_dotenv()
 import os
 os.environ["GROQ_API_KEY"]=os.getenv("GROQ_API_KEY")
@@ -38,6 +38,8 @@ class SQLAgent:
         self.list_tables_tool = None
         self.sql_db_query = None
         self.get_schema_tool = None
+        self.repl = PythonREPL()
+        self.code = None 
 
         # Setting up LLM
         # self.llm = ChatGroq(model=model,api_key = os.getenv("GROQ_API_KEY"))
@@ -55,7 +57,6 @@ class SQLAgent:
             # print("Database connection successful!")
             self.db = DatabaseConnection(connection_string).db
             print("Database connection successful!")
-            # Initialize toolkit and tools class 
             self.db_tools = DatabaseTools(db=self.db, llm=self.llm)
 
             try:
@@ -97,23 +98,30 @@ class SQLAgent:
                 1. list_table_tools - List all tables from the database
                 2. get_schema - Get the schema of required tables
                 3. generate_query - Generate a SQL query
-                
                 4. execute_query - Execute the query
-                5. response - Create response for the user
+                5. visualization_agent - Generate visualization if required
+                6. response - Create response for the user
 
                 Current state:
                 - Tables listed: {tables_list}
                 - Schema retrieved: {schema_of_table}
                 - Query generated: {query_gen}
                 - Query executed: {execute_query}
+                - Visualization required: {visualization_required}
+                - Visualization generated: {bs64_image}
                 - Response created: {response_to_user}
                 
-                If no tables are listed, respond with 'list_table_tools'.
-                If tables are listed but no schema, respond with 'get_schema'.
-                If schema exists but no query generated, respond with 'generate_query'.
-                If query generated but not executed, respond with 'execute_query'.
-                If query executed but no response, respond with 'response'.
-                If everything is complete, respond with 'DONE'.
+                IMPORTANT DECISION LOGIC (follow this order strictly):
+                1. If no tables are listed, respond with 'list_table_tools'.
+                2. If tables are listed but no schema, respond with 'get_schema'.
+                3. If schema exists but no query generated, respond with 'generate_query'.
+                4. If query generated but not executed, respond with 'execute_query'.
+                5. If query executed AND visualization is required AND no visualization generated, respond with 'visualization_agent'.
+                6. If query executed AND (no visualization required OR visualization generated) AND no response created, respond with 'response'.
+                7. If everything is complete, respond with 'DONE'.
+                
+                CRITICAL: Never call visualization_agent unless query has been executed first!
+                CRITICAL: If visualization is already generated (bs64_image is not empty), do not call visualization_agent again!
                 
                 Respond with ONLY the tool name or 'DONE'.
                 """),
@@ -130,15 +138,23 @@ class SQLAgent:
             if not state.get("query"):
                 state["query"] = task
             
+            # Check if visualization is required based on query keywords
+            visualization_keywords = ["graph", "chart", "plot", "visualize", "visualization", "bar chart", "pie chart", "histogram", "scatter plot", "line chart"]
+            if not state.get("visualization_required") and any(keyword in task.lower() for keyword in visualization_keywords):
+                state["visualization_required"] = True
+                print(f"🎨 Visualization detected in query: {task}")
+            
             # Check what's been completed (convert to boolean properly)
             tables_list = bool(state.get("tables_list", "").strip())
             schema_of_table = bool(state.get("schema_of_table", "").strip())
             query_gen = bool(state.get("query_gen", "").strip())
             # check_query = bool(state.get("check_query", "").strip())
             execute_query = bool(state.get("execute_query", "").strip())
+            visualization_required = bool(state.get("visualization_required", False))
+            bs64_image = bool(state.get("bs64_image", "").strip())
             response_to_user = bool(state.get("response_to_user", "").strip())
             
-            # print(f"State check - Tables: {tables_list}, Schema: {schema_of_table}, Query: {query_gen}, Check: {check_query}, Execute: {execute_query}, Response: {response_to_user}")
+            # print(f"State check - Tables: {tables_list}, Schema: {schema_of_table}, Query: {query_gen}, Execute: {execute_query}, Viz Required: {visualization_required}, Viz Generated: {bs64_image}, Response: {response_to_user}")
             
             chain = creating_sql_agent_chain()
             decision = chain.invoke({
@@ -148,10 +164,18 @@ class SQLAgent:
                 "query_gen": query_gen,
                 # "check_query": check_query,
                 "execute_query": execute_query,
+                "visualization_required": visualization_required,
+                "bs64_image": bs64_image,
                 "response_to_user": response_to_user
             })
             decision_text = decision.content.strip().lower()
             print(f"Agent decision: {decision_text}")
+            print(f"🔍 State check - Tables: {tables_list}, Schema: {schema_of_table}, Query: {query_gen}, Execute: {execute_query}, Viz Required: {visualization_required}, Viz Generated: {bs64_image}")
+            
+            # Add safety check to prevent calling visualization before execution
+            if "visualization_agent" in decision_text and not execute_query:
+                print("⚠️ WARNING: Trying to call visualization before execution. Forcing execute_query instead.")
+                decision_text = "execute_query"
             
             if "done" in decision_text:
                 next_tool = "end"
@@ -171,6 +195,9 @@ class SQLAgent:
             elif "execute_query" in decision_text:
                 next_tool = "execute_query"
                 agent_msg = "📋 SQL Agent: Executing query."
+            elif "visualization_agent" in decision_text:
+                next_tool = "visualization_agent"
+                agent_msg = "🎨 SQL Agent: Generating visualization."
             elif "response" in decision_text:
                 next_tool = "response"
                 agent_msg = "📋 SQL Agent: Creating response."
@@ -181,25 +208,91 @@ class SQLAgent:
             return {
                 "messages": [AIMessage(content=agent_msg)],
                 "next_tool": next_tool,
-                "current_task": task
+                "current_task": task,
+                "visualization_required": visualization_required  # Update state
             }
-        
+        def visualization_agent(state: SQLAgentState)-> Dict:
+            """Creates a visualization agent that generates visualizations based on query results.
+
+                Args:
+                    state: The current state containing query execution results.
+
+            Returns:
+                Updated state with visualization.
+            """
+            print("🎨 Generating visualization...")
+            # Implement the visualization logic here
+            query_execution_results = state.get("execute_query", "")
+            user_query = state.get("query", "")
+            
+            prompt = f"""Generate a visualization for the following query results: {query_execution_results} based on the query: {user_query}.
+            Use appropriate libraries like matplotlib or seaborn to create the visualization.
+            Ensure the visualization is clear and informative.
+            always return the visualization as a base64 encoded string.
+            Example generated code :
+                import matplotlib.pyplot as plt
+                import numpy as np
+                import io
+                import base64
+                import matplotlib
+                matplotlib.use('Agg')
+                x = np.linspace(0, 10, 100)
+                y = np.sin(x)
+                plt.figure()
+                plt.plot(x, y)
+                plt.xlabel("X-axis")
+                plt.ylabel("Y-axis")
+                plt.title("Simple Sine Wave Plot")
+                buf = io.BytesIO()
+                plt.savefig(buf, format='png', bbox_inches='tight')
+                plt.close()
+                png_bytes = buf.getvalue()
+                base64_string = base64.b64encode(png_bytes).decode('utf-8')
+                print(base64_string)
+            """
+            prompt_template=PromptTemplate.from_template(prompt)
+            # Create the chain: PromptTemplate -> LLM
+            llm_chain = prompt_template | self.llm
+            response = llm_chain.invoke({
+                "query": user_query,
+                "query_execution_results": query_execution_results
+            })
+            self.code = response.content.removeprefix("```python").removesuffix("```")
+            result = self.repl.run(self.code)
+            print(result)
+            print("✅ Visualization generated successfully!")
+            
+            return {
+                "messages": [AIMessage(content="🎨 Visualization generated successfully!")],
+                "bs64_image": result.strip() if result else "",
+                "next_tool": "sql_agent"  # Go back to sql_agent to continue workflow
+            }
+    
         def router(state: SQLAgentState):
             """Route to the next node"""
             print("🔁 Entering router...")
             next_tool = state.get("next_tool", "")
             print(f"➡️ Next tool: {next_tool}")
             
+            # Add loop counter to prevent infinite loops
+            loop_count = state.get("loop_count", 0) + 1
+            state["loop_count"] = loop_count
+            
+            if loop_count > 20:  # Safety limit
+                print("⚠️ WARNING: Too many loops detected, ending workflow")
+                return END
+            
             if next_tool == "end" or state.get("task_complete", False):
                 return END
             
-            # valid_tools = [
-            #     "sql_agent", "list_table_tools", "get_schema", "generate_query",
-            #     "check_query", "execute_query", "response"
-            # ]
+            # Safety check: if visualization is already generated and we're trying to call it again
+            if next_tool == "visualization_agent" and state.get("bs64_image", "").strip():
+                print("⚠️ WARNING: Visualization already generated, routing to sql_agent instead")
+                return "sql_agent"
+            
             valid_tools = [
                 "sql_agent", "list_table_tools", "get_schema", "generate_query",
-                "execute_query", "response"
+                "execute_query", "response", "visualization_agent"
             ]
             
             return next_tool if next_tool in valid_tools else "sql_agent"
@@ -212,6 +305,7 @@ class SQLAgent:
         workflow.add_node("list_table_tools", self.db_tools.list_table_tools)
         workflow.add_node("get_schema", self.db_tools.get_schema)
         workflow.add_node("generate_query", self.db_tools.generate_query)
+        workflow.add_node("visualization_agent", visualization_agent)
         # workflow.add_node("check_query", self.db_tools.check_query)
         workflow.add_node("execute_query", self.db_tools.execute_query)
         workflow.add_node("response", self.db_tools.create_response)
@@ -221,7 +315,7 @@ class SQLAgent:
 
         # Add routing
         # for node in ["sql_agent", "list_table_tools", "get_schema", "generate_query", "check_query", "execute_query", "response"]:
-        for node in ["sql_agent", "list_table_tools", "get_schema", "generate_query", "execute_query", "response"]:
+        for node in ["sql_agent", "list_table_tools", "get_schema", "generate_query", "execute_query", "response","visualization_agent"]:
             workflow.add_conditional_edges(
                 node,
                 router,
@@ -232,6 +326,7 @@ class SQLAgent:
                     "generate_query": "generate_query",
                     # "check_query": "check_query",
                     "execute_query": "execute_query",
+                    "visualization_agent": "visualization_agent",
                     "response": "response",
                     END: END
                 }
@@ -239,7 +334,7 @@ class SQLAgent:
 
         # Compile the graph
         self.app = workflow.compile()
-        # self.app.get_graph().draw_mermaid_png(output_file_path="sql_agent_workflow.png", draw_method=MermaidDrawMethod.API)
+        self.app.get_graph().draw_mermaid_png(output_file_path="sql_agent_workflow1.png", draw_method=MermaidDrawMethod.API)
                 
                 
   
@@ -281,6 +376,7 @@ class SQLAgent:
             raise ValueError("Workflow not initialized. Please set up the connection first.")
         # First, handle simple queries like "list tables" directly
         query_lower = query.lower()
+        print(query_lower)
         if any(phrase in query_lower for phrase in ["list all the tables", "show tables", "name of tables",
                                                     "which tables are present", "how many tables", "list all tables"]):
             if self.db_tools.list_tables_tool:
@@ -309,6 +405,9 @@ class SQLAgent:
         "messages": [HumanMessage(content=query)],
         "query": query
         })
+        ## check if the response contains visualization agent call then return the visualization agent output
+        if "visualization_agent" in response["messages"][-1].tool_calls:
+            return response["messages"][-1].tool_calls["visualization_agent"]["args"]["bs64_image"]
 
         return response["messages"][-1].content
 

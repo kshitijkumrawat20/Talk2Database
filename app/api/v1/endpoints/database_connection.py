@@ -58,7 +58,7 @@ async def setup_connection(request: DatabaseConnectionRequest):
     try:
         # Basic validation of connection string format
         parsed = urlparse(request.connection_string)
-        if not all([parsed.scheme, parsed.netloc]):
+        if not all([parsed.scheme, parsed.netloc]): 
             raise HTTPException(
                 status_code=400,
                 detail="Invalid connection string format. Expected format: dialect+driver://username:password@host:port/database"
